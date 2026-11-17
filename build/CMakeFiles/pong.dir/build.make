@@ -114,6 +114,7 @@ pong_EXTERNAL_OBJECTS =
 pong: CMakeFiles/pong.dir/main.cpp.o
 pong: CMakeFiles/pong.dir/game.cpp.o
 pong: CMakeFiles/pong.dir/build.make
+pong: /opt/homebrew/lib/libSDL3_ttf.0.2.2.dylib
 pong: /opt/homebrew/lib/libSDL3.0.dylib
 pong: CMakeFiles/pong.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/hrithikd/projects/game/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX executable pong"

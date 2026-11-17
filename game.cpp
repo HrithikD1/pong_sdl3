@@ -5,7 +5,17 @@
 using namespace std;
 
 Game::Game()
-    : mWindow(nullptr), mRenderer(nullptr), mFont(nullptr), isRunning(true), mPaddle1{50, 200, 10, 100}, mPaddle2{580, 200, 10, 100}, mBall{315, 235, 10, 10}, ballVelocityX(150.0f), ballVelocityY(75.0f), player1Score(0), player2Score(0)
+: 
+    mWindow(nullptr), 
+    mRenderer(nullptr), 
+    mFont(nullptr), isRunning(true), 
+    mPaddle1{50, 200, 10, 100}, mPaddle2{580, 200, 10, 100}, 
+    mBall{315, 235, 10, 10}, 
+    ballVelocityX(300.0f), ballVelocityY(200.5f), 
+    player1Score(0), player2Score(0), 
+    isPaused(false),
+    hasHitOccured(false),
+    mLastTicks(0), deltaTime(0.0f)
 {
 }
 
@@ -26,20 +36,30 @@ bool Game::init()
         cerr << "Error creating window and renderer: " << SDL_GetError() << endl;
         return false;
     }
-    mFont = TTF_OpenFont("path/to/font.ttf", 24);
+    if(!TTF_Init()) 
+    {
+        cerr << "Error initializing SDL_ttf: " << SDL_GetError() << endl;
+        return false;
+    }
+    mFont = TTF_OpenFont("font.ttf", 24);
     if (!mFont)
     {
         cerr << "Error loading font: " << SDL_GetError() << endl;
         return false;
     }
+
+    SDL_SetWindowTitle(mWindow, "PONG in SDL3 by hrithik"); 
+
     return true;
 }
 
 void Game::shutdown()
 {
+    if(mFont) TTF_CloseFont(mFont);
     if (mRenderer) SDL_DestroyRenderer(mRenderer);
     if (mWindow) SDL_DestroyWindow(mWindow);
     SDL_Quit();
+    TTF_Quit();
 }
 
 void Game::processInput()
@@ -51,87 +71,117 @@ void Game::processInput()
         {
             isRunning = false;
         }
+        if(event.type == SDL_EVENT_KEY_DOWN)
+        {
+            if(event.key.key == SDLK_P)
+            {
+                isPaused = !isPaused;
+            }
+            if(event.key.key == SDLK_RETURN || event.key.key == SDLK_SPACE)
+            {
+                isStarted = true;
+            }
+        }
         if(event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)
         {
             isRunning = false;
         }
     }
 
-    const bool* keystates = SDL_GetKeyboardState(NULL);
-    if (keystates[SDL_SCANCODE_W] || keystates[SDL_SCANCODE_UP]) mPaddle1.y -= 5.0f;
-    if (keystates[SDL_SCANCODE_S] || keystates[SDL_SCANCODE_DOWN]) mPaddle1.y += 5.0f;
-    if (mPaddle1.y < 0) mPaddle1.y = 0;
-    if (mPaddle1.y > 480 - mPaddle1.h) mPaddle1.y = 480 - mPaddle1.h;
+    if(isStarted && !isPaused)
+    {
+        const bool* keystates = SDL_GetKeyboardState(NULL);
+        float paddleSpeed = 400.0f; // Speed at which paddles move
+        if (keystates[SDL_SCANCODE_W] || keystates[SDL_SCANCODE_UP]) mPaddle1.y -= paddleSpeed * deltaTime;
+        if (keystates[SDL_SCANCODE_S] || keystates[SDL_SCANCODE_DOWN]) mPaddle1.y += paddleSpeed * deltaTime;
+        if (mPaddle1.y < 0) mPaddle1.y = 0;
+        if (mPaddle1.y > 480 - mPaddle1.h) mPaddle1.y = 480 - mPaddle1.h;
 
-    if (keystates[SDL_SCANCODE_I] || keystates[SDL_SCANCODE_LEFT]) mPaddle2.y -= 5.0f;
-    if (keystates[SDL_SCANCODE_K] || keystates[SDL_SCANCODE_RIGHT]) mPaddle2.y += 5.0f;
-    if (mPaddle2.y < 0) mPaddle2.y = 0;
-    if (mPaddle2.y > 480 - mPaddle2.h) mPaddle2.y = 480 - mPaddle2.h;
+        if (keystates[SDL_SCANCODE_I] || keystates[SDL_SCANCODE_LEFT]) mPaddle2.y -= paddleSpeed * deltaTime;
+        if (keystates[SDL_SCANCODE_K] || keystates[SDL_SCANCODE_RIGHT]) mPaddle2.y += paddleSpeed * deltaTime;
+        if (mPaddle2.y < 0) mPaddle2.y = 0;
+        if (mPaddle2.y > 480 - mPaddle2.h) mPaddle2.y = 480 - mPaddle2.h;
+    }
 }
 
 void Game::updateGame()
 {
     // Update game state here
     // v = d/t, so d = v * t
-    float distanceX = ballVelocityX * 0.016f;
-    float distanceY = ballVelocityY * 0.016f;
+    float distanceX = ballVelocityX * deltaTime;
+    float distanceY = ballVelocityY * deltaTime;
 
     mBall.x += distanceX; // Assuming 60 FPS, so delta time is ~0.016 seconds
     mBall.y += distanceY; // Assuming 60 FPS, so delta time is ~0.016 seconds
-
-    // Check for collisions with walls and reverse direction if necessary
-    if(mBall.y <= 0 || mBall.y > 480 - mBall.h) ballVelocityY = -ballVelocityY; // Bounce off top and bottom; (velocity switches direction)
-    if (mBall.x <= 0 || mBall.x > 640 - mBall.h) ballVelocityX = -ballVelocityX; // Bounce off left and right;
-
     // Check for collisions with paddles
-    if(SDL_HasRectIntersectionFloat(&mBall, &mPaddle1) || SDL_HasRectIntersectionFloat(&mBall, &mPaddle2))
+    if(SDL_HasRectIntersectionFloat(&mBall, &mPaddle1))
     {
         ballVelocityX = -ballVelocityX; // Bounce off paddles
+        mBall.x = mPaddle1.x + mPaddle1.w;
+        hasHitOccured = true; // Set the flag to true when a hit occurs
     }
-
-    if(mBall.x < 0 || mBall.x > 640) // If the ball goes off the left or right side of the screen
+    if(SDL_HasRectIntersectionFloat(&mBall, &mPaddle2))
     {
-        // Reset ball position to center
-        mBall.x = 315;
-        mBall.y = 235;
-        // Reset ball velocity
-        ballVelocityX = 200.0f;
-        ballVelocityY = 150.0f;
+        ballVelocityX = -ballVelocityX; // Bounce off paddles
+        mBall.x = mPaddle2.x - mBall.w;
+        hasHitOccured = true; // Set the flag to true when a hit occurs
+    }
+    // Check top and bottom walls
+    if (mBall.y <= 0)
+    {
+        mBall.y = 0;
+        ballVelocityY = -ballVelocityY;
+        hasHitOccured = true; // Set the flag to true when a hit occurs
+    }
+    else if (mBall.y >= 480 - mBall.h)
+    {
+        mBall.y = 480 - mBall.h;
+        ballVelocityY = -ballVelocityY;
+        hasHitOccured = true; // Set the flag to true when a hit occurs
     }
 
     if(mBall.x < 0.0f) // If the ball goes off the left side of the screen
     {
         player2Score++; // Player 2 scores a point
-        std::string scoreMessage = "Player 1: " + std::to_string(player1Score) + " | Player 2: " + std::to_string(player2Score);
-        SDL_SetWindowTitle(mWindow, scoreMessage.c_str()); // Update window title with scores
-
         mBall.x = 315;
         mBall.y = 235;
         // Reset ball velocity
-        ballVelocityX = 200.0f;
-        ballVelocityY = 150.0f;
+        ballVelocityX = 300.0f;
+        ballVelocityY = 200.5f;
     }
     else if (mBall.x > 640.0f) // If the ball goes off the right side of the screen
     {
         player1Score++; // Player 1 scores a point
-        std::string scoreMessage = "Player 1: " + std::to_string(player1Score) + " | Player 2: " + std::to_string(player2Score);
-        SDL_SetWindowTitle(mWindow, scoreMessage.c_str()); // Update window title with scores
-
         mBall.x = 315;
         mBall.y = 235;
         // Reset ball velocity
-        ballVelocityX = -200.0f;
-        ballVelocityY = 150.0f;
+        ballVelocityX = -300.0f;
+        ballVelocityY = -200.5f;
     }
 
 }
 
 void Game::runLoop()
 {
+    uint64_t lastTicks = SDL_GetTicks();
+
     while (isRunning)
     {
+        uint64_t currentTicks = SDL_GetTicks();
+        deltaTime = static_cast<float>(currentTicks - lastTicks) / 1000.0f;
+        lastTicks = currentTicks;
+
+        if(deltaTime > 0.05f) // Cap deltaTime to avoid large jumps
+        {
+            deltaTime = 0.05f;
+        }
+
         processInput();
-        updateGame();
+        if(isStarted && !isPaused)
+        {
+            updateGame();
+        }
+
         render();
     }
 }
@@ -173,14 +223,53 @@ void Game::render()
     SDL_SetRenderDrawColor(mRenderer, 30, 35, 45, 255);
     SDL_RenderClear(mRenderer);
 
-    SDL_SetRenderDrawColor(mRenderer, 255, 255, 255, 255);
-    SDL_RenderFillRect(mRenderer, &mPaddle1);
-    SDL_RenderFillRect(mRenderer, &mPaddle2);
-    SDL_RenderFillRect(mRenderer, &mBall);
+    if(!isStarted)
+    {
+        renderText("Welcome to PONG! Press Enter or Space to Start.", 50.0f, 200.0f);
+        renderText("Press Enter or Space to Start the Game.", 50.0f, 300.0f);
+        renderText("Created by hrithik using SDL3 and C++14.", 50.0f, 250.0f);
+        SDL_RenderPresent(mRenderer);
+    }
+    else
+    {   
+        SDL_SetRenderDrawColor(mRenderer, 255, 255, 255, 255);
+        float lineWidth = 4.0f;
+        float centerX = (640.0f - lineWidth) / 2.0f;
+        SDL_FRect centerLine = {centerX, 0.0f, lineWidth, 480.0f};
+        SDL_RenderFillRect(mRenderer, &centerLine);
 
-    // Draw the score string near the top center of the screen
-    std::string scoreText = std::to_string(player1Score) + "    " + std::to_string(player2Score);
-    renderText(scoreText, 300.0f, 20.0f);
+        SDL_SetRenderDrawColor(mRenderer, 255, 255, 255, 255);
+        SDL_RenderFillRect(mRenderer, &mPaddle1);
+        SDL_RenderFillRect(mRenderer, &mPaddle2);
+        SDL_RenderFillRect(mRenderer, &mBall);
 
-    SDL_RenderPresent(mRenderer);
+        // Draw the score string near the top center of the screen
+        std::string score1Text = std::to_string(player1Score);
+        renderText(score1Text, 290.0f, 20.0f);
+
+        std::string score2Text = std::to_string(player2Score);
+        renderText(score2Text, 340.0f, 20.0f);
+
+
+        if(isPaused)
+        {
+            // 1. Enable blending so alpha transparency works
+            SDL_SetRenderDrawBlendMode(mRenderer, SDL_BLENDMODE_BLEND);
+
+            // 2. Draw a dark, semi-transparent rectangle covering the whole window (640x480)
+            SDL_FRect overlayRect = { 0.0f, 0.0f, 640.0f, 480.0f };
+            SDL_SetRenderDrawColor(mRenderer, 10, 15, 25, 180); // RGBA (180 out of 255 alpha)
+            SDL_RenderFillRect(mRenderer, &overlayRect);
+
+            // 3. Reset blend mode back to none for standard drawing
+            SDL_SetRenderDrawBlendMode(mRenderer, SDL_BLENDMODE_NONE);
+            renderText("Game Paused. Press P to Resume.", 150.0f, 200.0f);
+        }    
+        else if(!hasHitOccured)
+        {
+            renderText("Press P to Pause the Game.", 150.0f, 200.0f);
+        }
+
+        SDL_RenderPresent(mRenderer);
+    }
 }

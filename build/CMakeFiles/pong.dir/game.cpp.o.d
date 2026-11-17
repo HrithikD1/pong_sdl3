@@ -1039,4 +1039,5 @@ CMakeFiles/pong.dir/game.cpp.o: /Users/hrithikd/projects/game/game.cpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/stack \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/print \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/unistd.h \
+  /opt/homebrew/include/SDL3_ttf/SDL_ttf.h \
   /Users/hrithikd/projects/game/game.h

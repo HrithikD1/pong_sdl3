@@ -213,6 +213,9 @@ MySDL3Game_SOURCE_DIR:STATIC=/Users/hrithikd/projects/game
 //The directory containing a CMake configuration file for SDL3.
 SDL3_DIR:PATH=/opt/homebrew/lib/cmake/SDL3
 
+//The directory containing a CMake configuration file for SDL3_ttf.
+SDL3_ttf_DIR:PATH=/opt/homebrew/lib/cmake/SDL3_ttf
+
 //Value Computed by CMake
 pong_BINARY_DIR:STATIC=/Users/hrithikd/projects/game/build
 
